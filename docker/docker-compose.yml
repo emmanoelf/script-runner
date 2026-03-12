@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: always
+    container_name: pg-script-runner
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: script_runner
+      TZ: America/Sao_Paulo
+      PGTZ: America/Sao_Paulo
+    ports:
+      - 5432:5432
+    volumes:
+      - /var/lib/docker/volumes/pg-script-runner/_data
+    networks:
+      - postgres-network
+  
+  pg_admin:
+    image: dpage/pgadmin4
+    container_name: pg-script-runner-admin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "script.runner@leonet.com.br"
+      PGADMIN_DEFAULT_PASSWORD: "root"
+    ports:
+      - 16543:80
+    depends_on:
+      - postgres
+    networks:
+      - postgres-network
+    # http://localhost:16543/login
+
+networks:
+  postgres-network:
+    driver: bridge
