@@ -2,6 +2,7 @@ package com.scriptrunner.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -12,12 +13,13 @@ import java.util.UUID;
 
 @Component
 public class JwtTokenProvider {
-    private static final String SECRET_KEY = "fake_secret_Key";
+    @Value("${jwt.secret-key}")
+    private String secretKey;
     private static final long ACCESS_TOKEN_EXP_MS = 1000L * 60 * 60 * 8;
     private static final long REFRESH_TOKEN_EXP_MS = 1000L * 60 * 60 * 24 * 15;
 
     private Key getSigningKey() {
-        byte[] keyBytes = SECRET_KEY.getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes = this.secretKey.getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 

@@ -5,3 +5,5 @@ spring:
     url: jdbc:postgresql://localhost:5432/script_runner
     username: postgres
     password: root
+jwt:
+  secret-key: ${JWT_SECRET_KEY}
