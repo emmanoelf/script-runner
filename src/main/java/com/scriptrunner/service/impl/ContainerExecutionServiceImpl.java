@@ -22,6 +22,7 @@ public class ContainerExecutionServiceImpl {
     private static final String CONTAINER_WITH_IMAGE_NOT_FOUND = "Container with image %s not found.";
     private static final String COMMAND_WITH_ID_NOT_FOUND = "Command with id %s not found.";
     private static final String COMMAND_CANNOT_BE_EMPTY = "Command cannot be null or empty.";
+    private static final String[] KILL_COMMAND = { "kill", "-9" };
 
     public ContainerExecutionServiceImpl(DockerClient dockerClient) {
         this.dockerClient = dockerClient;
@@ -77,7 +78,7 @@ public class ContainerExecutionServiceImpl {
         if (commandId == null || commandId.isEmpty()) {
             throw new IllegalArgumentException(COMMAND_CANNOT_BE_EMPTY);
         }
-        
+
         if (!execExists(commandId)) {
             throw new RuntimeException(COMMAND_WITH_ID_NOT_FOUND.formatted(commandId));
         }
@@ -105,6 +106,24 @@ public class ContainerExecutionServiceImpl {
                 .getExitCodeLong();
 
         return new ExecResultDTO(stdout.toString(), stderr.toString(), exitCode);
+    }
+
+    public ExecResultDTO cancelCommandExecutionInContainer(String image, String commandId) throws InterruptedException {
+        if (image == null || image.isEmpty()) {
+            throw new IllegalArgumentException(IMAGE_CANNOT_BE_EMPTY);
+        }
+
+        if (commandId == null || commandId.isEmpty()) {
+            throw new IllegalArgumentException(COMMAND_CANNOT_BE_EMPTY);
+        }
+
+        if (!execExists(commandId)) {
+            throw new RuntimeException(COMMAND_WITH_ID_NOT_FOUND.formatted(commandId));
+        }
+
+        String commandIdToCancel = createCommandInContainer(image, KILL_COMMAND[0], KILL_COMMAND[1], commandId);
+
+        return executeCommandInContainer(commandIdToCancel);
     }
 
 }

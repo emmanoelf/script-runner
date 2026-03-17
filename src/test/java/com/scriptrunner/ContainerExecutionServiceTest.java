@@ -1,11 +1,14 @@
 package com.scriptrunner;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Optional;
 
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -118,5 +121,50 @@ class ContainerExecutionServiceTest {
 
         System.out.println("Stdout: " + result.getStdout());
         assertTrue(result.getStdout().contains("Hello, World!"));
+    }
+
+    @Test
+    @DisplayName("Should throw IllegalArgumentException when no image is provided for cancellation")
+    void shouldThrowIllegalArgumentExceptionWhenNoImageIsProvidedForCancellation() {
+        alpineContainer.start();
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            containerExecutionService.cancelCommandExecutionInContainer(null, "command-id");
+        });
+    }
+
+    @Test
+    @DisplayName("Should throw RuntimeException when command could not be found for cancellation")
+    void shouldThrowRuntimeExceptionWhenCommandCouldNotBeFoundForCancellation() {
+        alpineContainer.start();
+
+        assertThrows(RuntimeException.class, () -> {
+            containerExecutionService.cancelCommandExecutionInContainer("alpine", "non-existent-command-id");
+        });
+    }
+
+    @Test
+    @Disabled("wip")
+    @DisplayName("Should cancel a command execution in a given container and return the output")
+    void shouldCancelACommandExecutionInAGivenContainerAndReturnTheOutput() throws InterruptedException {
+        alpineContainer.start();
+
+        String commandId = containerExecutionService.createCommandInContainer(
+                "alpine",
+                "sh",
+                "-c",
+                "echo start; for i in $(seq 1 60); do echo \"running $i...\"; sleep 1; done");
+
+        containerExecutionService.executeCommandInContainer(commandId);
+
+        Thread.sleep(10000);
+
+        ExecResultDTO result = containerExecutionService.cancelCommandExecutionInContainer("alpine", commandId);
+
+        System.out.println("Stdout: " + result.getStdout());
+
+        assertTrue(result.getStdout().contains("running"));
+        assertFalse(result.getStdout().contains("running 60"));
+        assertNotEquals(0, result.getExitCode());
     }
 }
