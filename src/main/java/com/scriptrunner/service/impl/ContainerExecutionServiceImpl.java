@@ -1,7 +1,10 @@
 package com.scriptrunner.service.impl;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
 
@@ -22,7 +25,8 @@ public class ContainerExecutionServiceImpl {
     private static final String CONTAINER_WITH_IMAGE_NOT_FOUND = "Container with image %s not found.";
     private static final String COMMAND_WITH_ID_NOT_FOUND = "Command with id %s not found.";
     private static final String COMMAND_CANNOT_BE_EMPTY = "Command cannot be null or empty.";
-    private static final String[] KILL_COMMAND = { "kill", "-9" };
+    private static final String[] KILL_COMMAND = { "sh", "-c", "pkill -f 'running'" };
+    private final Map<String, ExecResultDTO> executions = new ConcurrentHashMap<>();
 
     public ContainerExecutionServiceImpl(DockerClient dockerClient) {
         this.dockerClient = dockerClient;
@@ -73,7 +77,7 @@ public class ContainerExecutionServiceImpl {
 
     }
 
-    public ExecResultDTO executeCommandInContainer(String commandId) throws InterruptedException {
+    public ExecResultDTO executeCommandInContainer(String commandId) {
 
         if (commandId == null || commandId.isEmpty()) {
             throw new IllegalArgumentException(COMMAND_CANNOT_BE_EMPTY);
@@ -83,29 +87,44 @@ public class ContainerExecutionServiceImpl {
             throw new RuntimeException(COMMAND_WITH_ID_NOT_FOUND.formatted(commandId));
         }
 
-        StringBuilder stdout = new StringBuilder();
-        StringBuilder stderr = new StringBuilder();
+        ExecResultDTO result = new ExecResultDTO(commandId);
 
-        dockerClient.execStartCmd(commandId).exec(new ResultCallback.Adapter<Frame>() {
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            try (ResultCallback.Adapter<Frame> callback = new ResultCallback.Adapter<Frame>() {
+                @Override
+                public void onNext(Frame frame) {
+                    String payload = new String(frame.getPayload());
 
-            @Override
-            public void onNext(Frame frame) {
-                String payload = new String(frame.getPayload());
+                    if (frame.getStreamType().equals(StreamType.STDOUT)) {
+                        result.getStdout().append(payload);
+                        // webSocketHandler.send(command, payload);
+                    }
 
-                if (frame.getStreamType() == StreamType.STDOUT) {
-                    stdout.append(payload);
-                } else if (frame.getStreamType() == StreamType.STDERR) {
-                    stderr.append(payload);
+                    if (frame.getStreamType().equals(StreamType.STDERR)) {
+                        result.getStderr().append(payload);
+                        // webSocketHandler.send(commandId, "[ERR] " + payload);
+                    }
                 }
+
+                @Override
+                public void onComplete() {
+                    // webSocketHandler.send(commandId, "[END] ");
+                }
+            }) {
+                dockerClient.execStartCmd(commandId)
+                        .exec(callback)
+                        .awaitCompletion();
+            } catch (Exception e) {
+                // webSocketHandler.send(commandId, "[ERROR] " + e.getMessage());
+            } finally {
+                result.setFinished(true);
             }
-        }).awaitCompletion();
+        });
 
-        Long exitCode = dockerClient
-                .inspectExecCmd(commandId)
-                .exec()
-                .getExitCodeLong();
+        result.setFuture(future);
+        executions.put(commandId, result);
 
-        return new ExecResultDTO(stdout.toString(), stderr.toString(), exitCode);
+        return result;
     }
 
     public ExecResultDTO cancelCommandExecutionInContainer(String image, String commandId) throws InterruptedException {
@@ -121,9 +140,15 @@ public class ContainerExecutionServiceImpl {
             throw new RuntimeException(COMMAND_WITH_ID_NOT_FOUND.formatted(commandId));
         }
 
-        String commandIdToCancel = createCommandInContainer(image, KILL_COMMAND[0], KILL_COMMAND[1], commandId);
+        ExecResultDTO result = executions.get(commandId);
 
-        return executeCommandInContainer(commandIdToCancel);
+        String commandIdToCancel = createCommandInContainer(image, KILL_COMMAND[0], KILL_COMMAND[1], KILL_COMMAND[2]);
+
+        executeCommandInContainer(commandIdToCancel);
+
+        result.getFuture().cancel(true);
+
+        return result;
     }
 
 }

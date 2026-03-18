@@ -1,26 +1,25 @@
 package com.scriptrunner.dto;
 
+import java.util.concurrent.CompletableFuture;
+
+import lombok.Data;
+import lombok.Setter;
+
+@Data
+@Setter
 public class ExecResultDTO {
 
-    private final String stdout;
-    private final String stderr;
-    private final Long exitCode;
+    private  String commandId;
+    private  StringBuilder stdout;
+    private  StringBuilder stderr;
+    private  CompletableFuture<?> future;
+    private  boolean finished;
 
-    public ExecResultDTO(String stdout, String stderr, Long exitCode) {
-        this.stdout = stdout;
-        this.stderr = stderr;
-        this.exitCode = exitCode;
-    }
-
-    public String getStdout() {
-        return stdout;
-    }
-
-    public String getStderr() {
-        return stderr;
-    }
-
-    public Long getExitCode() {
-        return exitCode;
+    public ExecResultDTO(String commandId) {
+        this.commandId = commandId;
+        this.stdout = new StringBuilder();
+        this.stderr = new StringBuilder();
+        future = null;
+        finished = false;
     }
 }
