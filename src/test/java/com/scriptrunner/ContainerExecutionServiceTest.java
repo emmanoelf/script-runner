@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Optional;
 
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -119,8 +118,10 @@ class ContainerExecutionServiceTest {
         String commandId = containerExecutionService.createCommandInContainer("alpine", "echo", "Hello, World!");
         ExecResultDTO result = containerExecutionService.executeCommandInContainer(commandId);
 
+        Thread.sleep(5000);
+
         System.out.println("Stdout: " + result.getStdout());
-        assertTrue(result.getStdout().contains("Hello, World!"));
+        assertTrue(result.getStdout().toString().contains("Hello, World!"));
     }
 
     @Test
@@ -144,7 +145,6 @@ class ContainerExecutionServiceTest {
     }
 
     @Test
-    @Disabled("wip")
     @DisplayName("Should cancel a command execution in a given container and return the output")
     void shouldCancelACommandExecutionInAGivenContainerAndReturnTheOutput() throws InterruptedException {
         alpineContainer.start();
@@ -163,8 +163,8 @@ class ContainerExecutionServiceTest {
 
         System.out.println("Stdout: " + result.getStdout());
 
-        assertTrue(result.getStdout().contains("running"));
-        assertFalse(result.getStdout().contains("running 60"));
-        assertNotEquals(0, result.getExitCode());
+        assertTrue(result.getStdout().toString().contains("running"));
+        assertFalse(result.getStdout().toString().contains("running 60"));
+        assertNotEquals(true, result.isFinished());
     }
 }
