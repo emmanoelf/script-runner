@@ -1,7 +1,8 @@
 package com.scriptrunner.security;
 
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -10,23 +11,26 @@ public class AuthCookieProvider {
     private static final int MAX_AGE_IN_SECONDS = 60 * 60 * 8;
 
     public void addAccessTokenCookie(HttpServletResponse response, String token){
-        Cookie cookie = new Cookie(COOKIE_NAME, token);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(MAX_AGE_IN_SECONDS);
-        cookie.setAttribute("SameSite", "Strict");
+        ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, token)
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(MAX_AGE_IN_SECONDS)
+                .sameSite("Lax")
+                .build();
 
-        response.addCookie(cookie);
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
-    public void clearAccessTokenCookie(HttpServletResponse response){
-        Cookie cookie = new Cookie(COOKIE_NAME, null);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(0);
+    public void clearAccessTokenCookie(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0)
+                .sameSite("Lax")
+                .build();
 
-        response.addCookie(cookie);
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 }
