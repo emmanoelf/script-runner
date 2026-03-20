@@ -6,7 +6,6 @@ import com.scriptrunner.model.User;
 import com.scriptrunner.reporitory.UserRepository;
 import com.scriptrunner.security.JwtTokenProvider;
 import com.scriptrunner.service.AuthenticationService;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,7 +23,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     public AuthenticationResponseDTO authenticate(LoginRequestDTO credentials) {
         User user = this.userRepository.findByUsername(credentials.username()).orElseThrow(() ->
-                new EntityNotFoundException("User not found"));
+                new BadCredentialsException("Invalid credentials"));
 
         if(!passwordEncoder.matches(credentials.password(), user.getPasswordHash())){
             throw new BadCredentialsException("Invalid credentials");
