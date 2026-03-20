@@ -15,10 +15,10 @@ import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Container;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.StreamType;
-import com.scriptrunner.dto.ExecResultDTO;
+import com.scriptrunner.dto.CommandExecutionResult;
 
 @Service
-public class ContainerExecutionServiceImpl {
+public class ContainerExecutionService {
 
     private final DockerClient dockerClient;
     private static final String IMAGE_CANNOT_BE_EMPTY = "Image name cannot be null or empty.";
@@ -26,9 +26,9 @@ public class ContainerExecutionServiceImpl {
     private static final String COMMAND_WITH_ID_NOT_FOUND = "Command with id %s not found.";
     private static final String COMMAND_CANNOT_BE_EMPTY = "Command cannot be null or empty.";
     private static final String[] KILL_COMMAND = { "sh", "-c", "pkill -f 'running'" };
-    private final Map<String, ExecResultDTO> executions = new ConcurrentHashMap<>();
+    private final Map<String, CommandExecutionResult> executions = new ConcurrentHashMap<>();
 
-    public ContainerExecutionServiceImpl(DockerClient dockerClient) {
+    public ContainerExecutionService(DockerClient dockerClient) {
         this.dockerClient = dockerClient;
     }
 
@@ -77,7 +77,7 @@ public class ContainerExecutionServiceImpl {
 
     }
 
-    public ExecResultDTO executeCommandInContainer(String commandId) {
+    public CommandExecutionResult executeCommandInContainer(String commandId) {
 
         if (commandId == null || commandId.isEmpty()) {
             throw new IllegalArgumentException(COMMAND_CANNOT_BE_EMPTY);
@@ -87,7 +87,7 @@ public class ContainerExecutionServiceImpl {
             throw new RuntimeException(COMMAND_WITH_ID_NOT_FOUND.formatted(commandId));
         }
 
-        ExecResultDTO result = new ExecResultDTO(commandId);
+        CommandExecutionResult result = new CommandExecutionResult(commandId);
 
         CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
             try (ResultCallback.Adapter<Frame> callback = new ResultCallback.Adapter<Frame>() {
@@ -127,7 +127,7 @@ public class ContainerExecutionServiceImpl {
         return result;
     }
 
-    public ExecResultDTO cancelCommandExecutionInContainer(String image, String commandId) throws InterruptedException {
+    public CommandExecutionResult cancelCommandExecutionInContainer(String image, String commandId) throws InterruptedException {
         if (image == null || image.isEmpty()) {
             throw new IllegalArgumentException(IMAGE_CANNOT_BE_EMPTY);
         }
@@ -140,7 +140,7 @@ public class ContainerExecutionServiceImpl {
             throw new RuntimeException(COMMAND_WITH_ID_NOT_FOUND.formatted(commandId));
         }
 
-        ExecResultDTO result = executions.get(commandId);
+        CommandExecutionResult result = executions.get(commandId);
 
         String commandIdToCancel = createCommandInContainer(image, KILL_COMMAND[0], KILL_COMMAND[1], KILL_COMMAND[2]);
 
