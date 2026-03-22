@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
 
 public interface AuthenticationController {
@@ -19,5 +20,5 @@ public interface AuthenticationController {
                     description = "User successfully authenticated",
                     content = {@Content(mediaType = "application/json", schema = @Schema(implementation = AuthenticationResponseDTO.class))})
     })
-    ResponseEntity<AuthenticationResponseDTO> authenticate(LoginRequestDTO credentials);
+    ResponseEntity<AuthenticationResponseDTO> authenticate(LoginRequestDTO credentials, HttpServletResponse response);
 }
