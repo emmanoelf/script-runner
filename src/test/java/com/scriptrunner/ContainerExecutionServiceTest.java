@@ -14,14 +14,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.testcontainers.containers.GenericContainer;
 
-import com.scriptrunner.dto.ExecResultDTO;
-import com.scriptrunner.service.impl.ContainerExecutionServiceImpl;
+import com.scriptrunner.dto.CommandExecutionResult;
+import com.scriptrunner.service.impl.ContainerExecutionService;
 
 @SpringBootTest
 class ContainerExecutionServiceTest {
 
     @Autowired
-    ContainerExecutionServiceImpl containerExecutionService;
+    ContainerExecutionService containerExecutionService;
 
     private static GenericContainer<?> alpineContainer = new GenericContainer<>("alpine:latest")
             .withCommand("sleep", "300");
@@ -116,7 +116,7 @@ class ContainerExecutionServiceTest {
         alpineContainer.start();
 
         String commandId = containerExecutionService.createCommandInContainer("alpine", "echo", "Hello, World!");
-        ExecResultDTO result = containerExecutionService.executeCommandInContainer(commandId);
+        CommandExecutionResult result = containerExecutionService.executeCommandInContainer(commandId);
 
         Thread.sleep(5000);
 
@@ -159,7 +159,7 @@ class ContainerExecutionServiceTest {
 
         Thread.sleep(10000);
 
-        ExecResultDTO result = containerExecutionService.cancelCommandExecutionInContainer("alpine", commandId);
+        CommandExecutionResult result = containerExecutionService.cancelCommandExecutionInContainer("alpine", commandId);
 
         System.out.println("Stdout: " + result.getStdout());
 
