@@ -25,10 +25,13 @@ public class Execution {
     private User user;
 
     @Column(nullable = false)
-    private String target;
-
-    @Column(nullable = false)
     private String instruction;
+
+    @Column(nullable = true)
+    private String precondition;
+
+    @Column(nullable = true)
+    private String image;
 
     @Enumerated(EnumType.STRING)
     private ExecutionStatus status;
