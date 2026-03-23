@@ -7,3 +7,5 @@ spring:
     password: root
 jwt:
   secret-key: ${JWT_SECRET_KEY}
+docker:
+  default-image: alpine
