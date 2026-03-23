@@ -28,8 +28,8 @@ public class ExecutionServiceImpl {
     @Value("${docker.default-image}")
     private String defaultImage;
 
-    public void startExecution(ExecutionRequest requestDto){
-        User user = this.userRepository.getReferenceById(requestDto.userId());
+    public UUID startExecution(ExecutionRequest requestDto, UUID userId){
+        User user = this.userRepository.getReferenceById(userId);
 
         String selectedImage = (requestDto.image() != null && !requestDto.image().isBlank())
                 ? requestDto.image() : defaultImage;
@@ -45,14 +45,16 @@ public class ExecutionServiceImpl {
 
         this.executionRepository.save(execution);
         this.runExecutionAsync(execution);
+        return execution.getId();
     }
 
-    @Async
+    @Async("executionTaskExecutor")
     public void runExecutionAsync(Execution execution){
         String topic = "/topic/execution/" + execution.getId();
         StringBuilder log = new StringBuilder();
 
         try{
+
             if(execution.getPrecondition() != null && !execution.getPrecondition().isBlank()){
                 this.executeCommand(execution.getImage(), execution.getPrecondition(), topic, log);
             }
@@ -61,6 +63,7 @@ public class ExecutionServiceImpl {
             execution.setStatus(ExecutionStatus.COMPLETED);
         }catch (Exception e){
             execution.setStatus(ExecutionStatus.FAILED);
+            System.out.println(e.getMessage());
             this.simpMessagingTemplate.convertAndSend(topic, "!![ERROR]!! " + e.getMessage());
         }finally {
             execution.setEndTime(LocalDateTime.now());
@@ -70,7 +73,7 @@ public class ExecutionServiceImpl {
     }
 
     private void executeCommand(String image, String command, String topic, StringBuilder log){
-        String commandId = this.containerExecutionService.createCommandInContainer(image, command);
+        String commandId = this.containerExecutionService.createCommandInContainer(image, "sh", "-c", "echo", command);
 
         CommandExecutionResult result = this.containerExecutionService.executeCommandInContainer(commandId, new CommandOutputListener() {
 
