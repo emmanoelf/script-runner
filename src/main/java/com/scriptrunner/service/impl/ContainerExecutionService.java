@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.scriptrunner.service.listener.CommandOutputListener;
 import org.springframework.stereotype.Service;
 
 import com.github.dockerjava.api.DockerClient;
@@ -77,7 +78,7 @@ public class ContainerExecutionService {
 
     }
 
-    public CommandExecutionResult executeCommandInContainer(String commandId) {
+    public CommandExecutionResult executeCommandInContainer(String commandId, CommandOutputListener listener) {
 
         if (commandId == null || commandId.isEmpty()) {
             throw new IllegalArgumentException(COMMAND_CANNOT_BE_EMPTY);
@@ -96,28 +97,29 @@ public class ContainerExecutionService {
                     String payload = new String(frame.getPayload());
 
                     if (frame.getStreamType().equals(StreamType.STDOUT)) {
-                        result.getStdout().append(payload);
-                        // webSocketHandler.send(command, payload);
+                        listener.onStdout(payload);
                     }
 
                     if (frame.getStreamType().equals(StreamType.STDERR)) {
-                        result.getStderr().append(payload);
-                        // webSocketHandler.send(commandId, "[ERR] " + payload);
+                        listener.onStderr(payload);
                     }
                 }
 
                 @Override
+                public void onError(Throwable throwable) {
+                    listener.onError(throwable);
+                }
+
+                @Override
                 public void onComplete() {
-                    // webSocketHandler.send(commandId, "[END] ");
+                    listener.onComplete();
                 }
             }) {
                 dockerClient.execStartCmd(commandId)
                         .exec(callback)
                         .awaitCompletion();
             } catch (Exception e) {
-                // webSocketHandler.send(commandId, "[ERROR] " + e.getMessage());
-            } finally {
-                result.setFinished(true);
+                listener.onError(e);
             }
         });
 
@@ -127,7 +129,7 @@ public class ContainerExecutionService {
         return result;
     }
 
-    public CommandExecutionResult cancelCommandExecutionInContainer(String image, String commandId) throws InterruptedException {
+    public CommandExecutionResult cancelCommandExecutionInContainer(String image, String commandId, CommandOutputListener listener) throws InterruptedException {
         if (image == null || image.isEmpty()) {
             throw new IllegalArgumentException(IMAGE_CANNOT_BE_EMPTY);
         }
@@ -144,7 +146,7 @@ public class ContainerExecutionService {
 
         String commandIdToCancel = createCommandInContainer(image, KILL_COMMAND[0], KILL_COMMAND[1], KILL_COMMAND[2]);
 
-        executeCommandInContainer(commandIdToCancel);
+        executeCommandInContainer(commandIdToCancel, listener);
 
         result.getFuture().cancel(true);
 
