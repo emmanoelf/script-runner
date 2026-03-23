@@ -1,0 +1,5 @@
+ALTER TABLE executions DROP COLUMN target;
+
+ALTER TABLE executions
+ADD COLUMN precondition VARCHAR(100),
+ADD COLUMN image VARCHAR(100);
