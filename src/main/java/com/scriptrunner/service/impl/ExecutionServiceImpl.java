@@ -1,13 +1,18 @@
 package com.scriptrunner.service.impl;
 
-import com.scriptrunner.dto.CommandExecutionResult;
+import com.scriptrunner.command.CommandExecutor;
+import com.scriptrunner.command.CommandExecutorResolver;
+import com.scriptrunner.command.CommandRequest;
+import com.scriptrunner.command.DockerCommandExecutor;
+import com.scriptrunner.command.LocalCommandExecutor;
+import com.scriptrunner.command.WebSocketHandler;
 import com.scriptrunner.dto.ExecutionRequest;
 import com.scriptrunner.model.Execution;
 import com.scriptrunner.model.ExecutionStatus;
 import com.scriptrunner.model.User;
 import com.scriptrunner.reporitory.ExecutionRepository;
 import com.scriptrunner.reporitory.UserRepository;
-import com.scriptrunner.service.listener.CommandOutputListener;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -23,16 +28,18 @@ public class ExecutionServiceImpl {
     private final ExecutionRepository executionRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate simpMessagingTemplate;
-    private final ContainerExecutionService containerExecutionService;
+    private final DockerCommandExecutor dockerCommandExecutor;
+    private final LocalCommandExecutor localCommandExecutor;
 
     @Value("${docker.default-image}")
     private String defaultImage;
 
-    public UUID startExecution(ExecutionRequest requestDto, UUID userId){
+    public UUID startExecution(ExecutionRequest requestDto, UUID userId) {
         User user = this.userRepository.getReferenceById(userId);
 
         String selectedImage = (requestDto.image() != null && !requestDto.image().isBlank())
-                ? requestDto.image() : defaultImage;
+                ? requestDto.image()
+                : null;
 
         Execution execution = Execution.builder()
                 .precondition(requestDto.precondition())
@@ -49,58 +56,37 @@ public class ExecutionServiceImpl {
     }
 
     @Async("executionTaskExecutor")
-    public void runExecutionAsync(Execution execution){
+    public void runExecutionAsync(Execution execution) {
         String topic = "/topic/execution/" + execution.getId();
         StringBuilder log = new StringBuilder();
 
-        try{
+        try {
 
-            if(execution.getPrecondition() != null && !execution.getPrecondition().isBlank()){
+            if (execution.getPrecondition() != null && !execution.getPrecondition().isBlank()) {
                 this.executeCommand(execution.getImage(), execution.getPrecondition(), topic, log);
             }
 
             this.executeCommand(execution.getImage(), execution.getInstruction(), topic, log);
             execution.setStatus(ExecutionStatus.COMPLETED);
-        }catch (Exception e){
+
+        } catch (Exception e) {
             execution.setStatus(ExecutionStatus.FAILED);
             System.out.println(e.getMessage());
             this.simpMessagingTemplate.convertAndSend(topic, "!![ERROR]!! " + e.getMessage());
-        }finally {
+        } finally {
             execution.setEndTime(LocalDateTime.now());
             this.executionRepository.save(execution);
             this.simpMessagingTemplate.convertAndSend(topic, "[END EXECUTION]");
         }
     }
 
-    private void executeCommand(String image, String command, String topic, StringBuilder log){
-        String commandId = this.containerExecutionService.createCommandInContainer(image, "sh", "-c", "echo", command);
+    private void executeCommand(String image, String command, String topic, StringBuilder log) {
+        WebSocketHandler handler = new WebSocketHandler(topic, simpMessagingTemplate);
+        CommandRequest request = new CommandRequest(image, command);
+        CommandExecutorResolver resolver = new CommandExecutorResolver(localCommandExecutor, dockerCommandExecutor);
+        CommandExecutor executor = resolver.resolve(new CommandRequest(image, command));
 
-        CommandExecutionResult result = this.containerExecutionService.executeCommandInContainer(commandId, new CommandOutputListener() {
-
-            @Override
-            public void onStdout(String line) {
-                log.append(line);
-                simpMessagingTemplate.convertAndSend(topic, line);
-            }
-
-            @Override
-            public void onStderr(String line) {
-                log.append(line);
-                simpMessagingTemplate.convertAndSend(topic, "[ERR] " + line);
-            }
-
-            @Override
-            public void onComplete() {
-
-            }
-
-            @Override
-            public void onError(Throwable error) {
-                simpMessagingTemplate.convertAndSend(topic, "[ERROR] " + error.getMessage());
-            }
-        });
-
-        result.getFuture().join();
+        executor.execute(request, handler);
     }
 
 }
