@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+    <title>Script Runner</title>
+
+```
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+```
+
+</head>
+<body>
+
+<h2>🚀 Script Runner</h2>
+
+<button onclick="login()">1. Login</button> <button onclick="connect()">2. Conectar WS</button> <button onclick="execute()">3. Executar</button>
+
+<br><br>
+
+<label>Precondition:</label><br> <input id="precondition" value="" size="50"/>
+
+<br><br>
+
+<label>Instruction:</label><br> <input id="instruction" value="echo hello from docker" size="50"/>
+
+<br><br>
+
+<label>Image:</label><br> <input id="image" value="" size="50"/>
+
+<br><br>
+
+<pre id="log" style="background:black;color:lime;padding:10px;height:300px;overflow:auto;"></pre>
+
+<script>
+let stomp;
+
+function log(msg) {
+    const el = document.getElementById("log");
+    el.textContent += msg + "\n";
+    el.scrollTop = el.scrollHeight;
+}
+
+// 🔐 LOGIN
+async function login() {
+    await fetch("http://localhost:8080/v1/auth/login", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({
+            username: "admin",
+            password: "admin"
+        })
+    });
+
+    log("✅ Logado (cookie salvo)");
+}
+
+// 🔌 WEBSOCKET
+function connect() {
+    const socket = new SockJS("http://localhost:8080/ws");
+
+    stomp = Stomp.over(socket);
+
+    stomp.connect({}, function () {
+        log("🔌 WebSocket conectado!");
+    }, function (error) {
+        log("❌ Erro WS: " + error);
+    });
+}
+
+// ▶️ EXECUÇÃO
+async function execute() {
+
+    const precondition = document.getElementById("precondition").value;
+    const instruction = document.getElementById("instruction").value;
+    const image = document.getElementById("image").value;
+
+    const res = await fetch("http://localhost:8080/v1/executions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({
+            instructions: instruction,
+            precondition: precondition,
+            image: image
+        })
+    });
+
+    const executionId = await res.json();
+
+    log("🚀 Execution ID: " + executionId);
+
+    stomp.subscribe(`/topic/execution/${executionId}`, function (msg) {
+        log(msg.body);
+    });
+}
+</script>
+
+</body>
+</html>
